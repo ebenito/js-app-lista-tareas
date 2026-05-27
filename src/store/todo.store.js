@@ -8,11 +8,11 @@ export const Filters = {
 
 const state = {
     todos: [
-        new Todo('Pieda del alma'),
-        new Todo('Pieda del espacio'),
-        new Todo('Pieda del tiempo'),
-        new Todo('Pieda del poder'),
-        new Todo('Pieda del realidad'),
+        new Todo('Planificar observación del eclipse'),
+        new Todo('Comrprar gafas de eclipse en Tubkala.com'),
+        new Todo('Reservar alojamiento en la zona'),
+        new Todo('Crear parametros personalizados para la Reflex'),
+        new Todo('Compartir fotos del eclipse con la comunidad'),
     ],
     filter: Filters.All,
 }
