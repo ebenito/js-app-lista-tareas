@@ -2,14 +2,14 @@ import { Todo } from '../todos/models/todo.model';
 
 export const Filters = {
     All: 'all',
-    Completed: 'Completed',
-    Pending: 'Pending'
+    Completed: 'completed',
+    Pending: 'pending'
 }
 
 const state = {
     todos: [
         new Todo('Planificar observación del eclipse'),
-        new Todo('Comrprar gafas de eclipse en Tubkala.com'),
+        new Todo('Comprar gafas de eclipse en Tubkala.com'),
         new Todo('Reservar alojamiento en la zona'),
         new Todo('Crear parametros personalizados para la Reflex'),
         new Todo('Compartir fotos del eclipse con la comunidad'),
@@ -27,7 +27,13 @@ const loadStore = () => {
     if( !localStorage.getItem('state') ) return;
 
     const { todos = [], filter = Filters.All } = JSON.parse( localStorage.getItem('state') );
-    state.todos = todos;
+    state.todos = todos.map( todo => {
+        const t = new Todo( todo.description );
+        t.id = todo.id;
+        t.done = todo.done;
+        t.createdAt = new Date( todo.createdAt );
+        return t;
+    });
     state.filter = filter;
 }
 
@@ -90,6 +96,25 @@ const deleteCompleted = () => {
     saveStateToLocalStorage();
 }
 
+const toggleAll = () => {
+    const allCompleted = state.todos.every( todo => todo.done );
+    state.todos.forEach( todo => { todo.done = !allCompleted; });
+    saveStateToLocalStorage();
+}
+
+const updateTodo = ( todoId, description ) => {
+    if ( !description.trim() ) throw new Error('Description is required');
+    state.todos = state.todos.map( todo => {
+        if ( todo.id === todoId ) todo.description = description.trim();
+        return todo;
+    });
+    saveStateToLocalStorage();
+}
+
+const isAllCompleted = () => {
+    return state.todos.length > 0 && state.todos.every( todo => todo.done );
+}
+
 /**
  * 
  * @param {Filters} newFilter 
@@ -111,7 +136,10 @@ export default {
     getCurrentFilter,
     getTodos,
     initStore,
+    isAllCompleted,
     loadStore,
     setFilter,
+    toggleAll,
     toggleTodo,
+    updateTodo,
 }

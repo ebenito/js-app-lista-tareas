@@ -10,22 +10,33 @@ export const createTodoHTML = ( todo ) => {
 
     const { done, description, id } = todo;
 
-    const html = `
-        <div class="view">
-            <input class="toggle" type="checkbox" ${ done ? 'checked': '' }>
-            <label>${ description }</label>
-            <button class="destroy"></button>
-        </div>
-        <input class="edit" value="Create a TodoMVC template">
-    `;
-
     const liElement = document.createElement('li');
-    liElement.innerHTML = html;
-    liElement.setAttribute('data-id', id );
+    liElement.setAttribute('data-id', id);
+    if ( done ) liElement.classList.add('completed');
 
-    if ( todo.done )
-        liElement.classList.add('completed');
-    
+    // Vista (safe: no XSS — se usa textContent para la descripción)
+    const viewDiv = document.createElement('div');
+    viewDiv.className = 'view';
+
+    const checkbox = document.createElement('input');
+    checkbox.className = 'toggle';
+    checkbox.type = 'checkbox';
+    checkbox.checked = done;
+
+    const label = document.createElement('label');
+    label.textContent = description;
+
+    const destroyBtn = document.createElement('button');
+    destroyBtn.className = 'destroy';
+
+    viewDiv.append(checkbox, label, destroyBtn);
+
+    // Input de edición inline
+    const editInput = document.createElement('input');
+    editInput.className = 'edit';
+    editInput.value = description;
+
+    liElement.append(viewDiv, editInput);
 
     return liElement;
 }

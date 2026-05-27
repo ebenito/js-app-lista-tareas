@@ -9,6 +9,9 @@ const ElementIDs = {
     NewTodoInput: '#new-todo-input',
     TodoFilters: '.filtro',
     PendingCountLabel: '#pending-count',
+    ToggleAll: '#toggle-all',
+    MainSection: '.main',
+    FooterSection: '.footer',
 }
 
 /**
@@ -21,10 +24,53 @@ export const App = ( elementId ) => {
         const todos = todoStore.getTodos( todoStore.getCurrentFilter() );
         renderTodos( ElementIDs.TodoList, todos );
         updatePendingCount();
+        updateToggleAll();
+        updateEmptyState();
+        updateActiveFilter();
     }
 
     const updatePendingCount = () => {
-        renderPending(ElementIDs.PendingCountLabel);
+        renderPending( ElementIDs.PendingCountLabel );
+    }
+
+    const updateToggleAll = () => {
+        const toggleAll = document.querySelector( ElementIDs.ToggleAll );
+        if ( toggleAll ) toggleAll.checked = todoStore.isAllCompleted();
+    }
+
+    const updateEmptyState = () => {
+        const isEmpty = todoStore.getTodos( Filters.All ).length === 0;
+        const main = document.querySelector( ElementIDs.MainSection );
+        const footer = document.querySelector( ElementIDs.FooterSection );
+        if ( main ) main.style.display = isEmpty ? 'none' : '';
+        if ( footer ) footer.style.display = isEmpty ? 'none' : '';
+    }
+
+    const updateActiveFilter = () => {
+        const currentFilter = todoStore.getCurrentFilter();
+        document.querySelectorAll( ElementIDs.TodoFilters ).forEach( el => {
+            el.classList.toggle( 'selected', el.dataset.filter === currentFilter );
+        });
+    }
+
+    const setFilterFromHash = () => {
+        const hash = window.location.hash;
+        let filter = Filters.All;
+        if ( hash === '#/active' ) filter = Filters.Pending;
+        else if ( hash === '#/completed' ) filter = Filters.Completed;
+        todoStore.setFilter( filter );
+        displayTodos();
+    }
+
+    const commitEdit = ( liElement, input ) => {
+        const newValue = input.value.trim();
+        if ( newValue ) {
+            todoStore.updateTodo( liElement.getAttribute('data-id'), newValue );
+        } else {
+            todoStore.deleteTodo( liElement.getAttribute('data-id') );
+        }
+        liElement.classList.remove('editing');
+        displayTodos();
     }
 
     // Cuando la función App() se llama
@@ -32,7 +78,7 @@ export const App = ( elementId ) => {
         const app = document.createElement('div');
         app.innerHTML = html;
         document.querySelector(elementId).append( app );
-        displayTodos();
+        setFilterFromHash();
     })();
 
 
@@ -40,31 +86,62 @@ export const App = ( elementId ) => {
     const newDescriptionInput = document.querySelector( ElementIDs.NewTodoInput );
     const todoListUL = document.querySelector( ElementIDs.TodoList );
     const clearCompletedButton = document.querySelector( ElementIDs.ClearCompletedButton );
-    const filtersLIs = document.querySelectorAll( ElementIDs.TodoFilters );
+    const toggleAllCheckbox = document.querySelector( ElementIDs.ToggleAll );
 
-    // Listeners
+    // Nuevo todo (event.key reemplaza el deprecado event.keyCode)
     newDescriptionInput.addEventListener('keyup', ( event ) => {
-        if ( event.keyCode !== 13 ) return;
+        if ( event.key !== 'Enter' ) return;
         if ( event.target.value.trim().length === 0 ) return;
 
-        todoStore.addTodo( event.target.value );
+        todoStore.addTodo( event.target.value.trim() );
         displayTodos();
         event.target.value = '';
     });
 
-    todoListUL.addEventListener('click', (event) => {
+    // Listener unificado: toggle y eliminar
+    todoListUL.addEventListener('click', ( event ) => {
         const element = event.target.closest('[data-id]');
-        todoStore.toggleTodo( element.getAttribute('data-id') );
-        displayTodos();
+        if ( !element ) return;
+
+        if ( event.target.classList.contains('destroy') ) {
+            todoStore.deleteTodo( element.getAttribute('data-id') );
+            displayTodos();
+        } else if ( event.target.classList.contains('toggle') ) {
+            todoStore.toggleTodo( element.getAttribute('data-id') );
+            displayTodos();
+        }
     });
 
-    todoListUL.addEventListener('click', (event) => {
-        const isDestroyElement = event.target.className === 'destroy';
-        const element = event.target.closest('[data-id]');
-        if ( !element || !isDestroyElement ) return;
+    // Edición inline: doble clic sobre una tarea
+    todoListUL.addEventListener('dblclick', ( event ) => {
+        const liElement = event.target.closest('[data-id]');
+        if ( !liElement ) return;
+        liElement.classList.add('editing');
+        const editInput = liElement.querySelector('.edit');
+        if ( editInput ) {
+            editInput.focus();
+            editInput.setSelectionRange( editInput.value.length, editInput.value.length );
+        }
+    });
 
-        todoStore.deleteTodo( element.getAttribute('data-id') );
-        displayTodos();
+    // Enter confirma la edición, Escape la cancela
+    todoListUL.addEventListener('keyup', ( event ) => {
+        const liElement = event.target.closest('[data-id]');
+        if ( !liElement || !liElement.classList.contains('editing') ) return;
+
+        if ( event.key === 'Enter' ) {
+            commitEdit( liElement, event.target );
+        } else if ( event.key === 'Escape' ) {
+            liElement.classList.remove('editing');
+            displayTodos();
+        }
+    });
+
+    // Al perder el foco también confirma la edición
+    todoListUL.addEventListener('focusout', ( event ) => {
+        const liElement = event.target.closest('[data-id]');
+        if ( !liElement || !liElement.classList.contains('editing') ) return;
+        commitEdit( liElement, event.target );
     });
 
     clearCompletedButton.addEventListener( 'click', () => {
@@ -72,30 +149,13 @@ export const App = ( elementId ) => {
         displayTodos();
     });
 
-    filtersLIs.forEach( element => {
-
-        element.addEventListener('click', (element) => {
-            filtersLIs.forEach( el => el.classList.remove('selected') );
-            element.target.classList.add('selected');
-
-            switch( element.target.text ){
-                case 'Todos':
-                    todoStore.setFilter( Filters.All )
-                break;
-                case 'Pendientes':
-                    todoStore.setFilter( Filters.Pending )
-                break;
-                case 'Completados':
-                    todoStore.setFilter( Filters.Completed )
-                break;
-            }
-
-            displayTodos();
-
-        });
-
-
+    // Marcar / desmarcar todas las tareas
+    toggleAllCheckbox.addEventListener('click', () => {
+        todoStore.toggleAll();
+        displayTodos();
     });
 
+    // Hash routing: los filtros navegan por el hash de la URL
+    window.addEventListener('hashchange', setFilterFromHash);
 
 }
